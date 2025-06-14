@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+.pytest_cache/
+.venv/
+venv/
+ENV/
+env/
+env.bak/
+venv.bak/
+
+# C/C++ build artifacts
+*.o
+*.a
+*.out
+*.exe
+*.dll
+
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+*.cbp
+
+# Compiled Python extension
+*.cpython-*.so
+
+# Project-specific artifacts
+*.fk
+
+# IDE and OS files
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*~
