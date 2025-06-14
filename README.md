@@ -4,6 +4,9 @@ A high-performance, 3-DOF (x, y, theta) motion planner for moving objects in a p
 
 This project is implemented in C++ for performance and wrapped in Python using `pybind11` for ease of use.
 
+![Planning Result](assets/planning.jpg)
+*Example of collision-free path planning for a 3D object navigating through obstacles using RRT***
+
 ## Features
 
 -   **RRT\* Planner**: An optimal sampling-based algorithm to quickly find high-quality paths.
@@ -27,7 +30,7 @@ pip install -e .
 
 ## Usage
 
-Run the example
+Run the example to see the planner in action:
 
 ```bash
 python example/run_planner.py
