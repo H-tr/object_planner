@@ -146,11 +146,9 @@ def main():
     obstacle_points = np.vstack(all_obstacle_points)
     print(f"Object: {len(object_points)} pts. Obstacles: {len(obstacle_points)} pts.")
 
-    fk_file = "object_model.fk"
-    opp.create_sphere_tree_file(object_points, fk_file)
     print("\n--- Initializing Planner ---")
     planner = opp.Planner(
-        sphere_tree_file=fk_file,
+        object_points=object_points,
         obstacle_points=obstacle_points,
         x_bounds=MAP_X_BOUNDS,
         y_bounds=MAP_Y_BOUNDS,

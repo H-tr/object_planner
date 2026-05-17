@@ -1,7 +1,6 @@
 #include <nanobind/nanobind.h>
 #include <nanobind/ndarray.h>
 #include <nanobind/stl/pair.h>
-#include <nanobind/stl/string.h>
 #include <nanobind/stl/vector.h>
 
 #include "object_planner/object_planner.hpp"
@@ -33,11 +32,12 @@ inline std::vector<Point3D> numpy_to_points(const NumpyPoints &arr) {
 // Python caller can keep a single Planner object across plan() calls.
 class Planner {
 public:
-  Planner(const std::string &sphere_tree_file, const NumpyPoints &obstacle_points,
+  Planner(const NumpyPoints &object_points, const NumpyPoints &obstacle_points,
           const std::pair<double, double> &x_bounds,
           const std::pair<double, double> &y_bounds,
           const std::pair<double, double> &theta_bounds, float point_inflation) {
-    auto object_tree = SphereTreeBuilder::loadFromFile(sphere_tree_file);
+    auto object_pts = numpy_to_points(object_points);
+    auto object_tree = SphereTreeBuilder::build(object_pts);
     auto obs_pts = numpy_to_points(obstacle_points);
     checker_ = std::make_unique<BatchedCollisionChecker>(object_tree, obs_pts,
                                                           point_inflation);
@@ -90,21 +90,12 @@ NB_MODULE(object_planner_py, m) {
       .def_rw("neighborhood_radius",
               &RRTStarPlanner::PlanParams::neighborhood_radius);
 
-  m.def(
-      "create_sphere_tree_file",
-      [](NumpyPoints object_points, const std::string &filename) {
-        auto points = numpy_to_points(object_points);
-        auto tree = SphereTreeBuilder::build(points);
-        SphereTreeBuilder::saveToFile(filename, tree);
-      },
-      "object_points"_a, "filename"_a);
-
   nb::class_<Planner>(m, "Planner")
-      .def(nb::init<const std::string &, const NumpyPoints &,
+      .def(nb::init<const NumpyPoints &, const NumpyPoints &,
                     const std::pair<double, double> &,
                     const std::pair<double, double> &,
                     const std::pair<double, double> &, float>(),
-           "sphere_tree_file"_a, "obstacle_points"_a, "x_bounds"_a,
+           "object_points"_a, "obstacle_points"_a, "x_bounds"_a,
            "y_bounds"_a, "theta_bounds"_a, "point_inflation"_a = 0.0f)
       .def("plan", &Planner::plan, "start"_a, "goal"_a,
            "plan_params"_a = RRTStarPlanner::PlanParams(),

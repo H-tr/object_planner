@@ -7,7 +7,7 @@ name = "object_planner_py"
 version = "0.3.0"
 description = "A header-only, SIMD-accelerated 3-DOF object planner for tabletop pushing"
 readme = "README.md"
-authors = [{ name = "AI Assistant", email = "ai@example.com" }]
+authors = [{ name = "Hu Tianrun", email = "tianrunhu@gmail.com" }]
 license = { text = "MIT" }
 classifiers = [
     "License :: OSI Approved :: MIT License",
