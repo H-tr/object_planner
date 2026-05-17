@@ -155,6 +155,7 @@ def main():
         x_bounds=MAP_X_BOUNDS,
         y_bounds=MAP_Y_BOUNDS,
         theta_bounds=MAP_THETA_BOUNDS,
+        point_inflation=0.015,
     )
 
     print("--- Generating Start and Goal on Opposite Sides of the Map ---")

@@ -1,14 +1,14 @@
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.18)
 project(ObjectPlanner CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# --- Find Dependencies ---
+# --- Dependencies ----------------------------------------------------------
 find_package(Eigen3 3.3 REQUIRED NO_MODULE)
-find_package(pybind11 REQUIRED)
 
-# --- Fetch xsimd (SIMD library) ---
+# xsimd: SIMD primitives used by the collision checker's inner loop.
+# Header-only; we fetch it so downstream consumers get a vetted version.
 include(FetchContent)
 FetchContent_Declare(
   xsimd
@@ -17,16 +17,36 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(xsimd)
 
-# Add our C++ source library
-add_subdirectory(src)
+# --- Header-only library --------------------------------------------------
+# Downstream C++ consumers do:
+#     add_subdirectory(third_party/object_planner)
+#     target_link_libraries(my_project PRIVATE object_planner::object_planner)
+add_library(object_planner_core INTERFACE)
+add_library(object_planner::object_planner ALIAS object_planner_core)
+target_include_directories(object_planner_core INTERFACE
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+  ${EIGEN3_INCLUDE_DIR}
+  ${xsimd_SOURCE_DIR}/include
+)
+target_compile_features(object_planner_core INTERFACE cxx_std_17)
 
-# Define the Python module from the bindings file
-pybind11_add_module(object_planner_py SHARED py_src/object_planner_py/py_bindings.cpp)
+# --- Python bindings ------------------------------------------------------
+# nanobind: locate via its CMake helper. scikit-build-core ensures the
+# matching Python interpreter is set up before this point.
+find_package(Python 3.8 COMPONENTS Interpreter Development.Module REQUIRED)
+execute_process(
+  COMMAND "${Python_EXECUTABLE}" -m nanobind --cmake_dir
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+  OUTPUT_VARIABLE NB_DIR)
+list(APPEND CMAKE_PREFIX_PATH "${NB_DIR}")
+find_package(nanobind CONFIG REQUIRED)
 
-# Because object_planner_core has PUBLIC include directories, linking to it
-# is all we need to do. The include paths for Eigen, xsimd, nanoflann, and src
-# will be inherited automatically.
+nanobind_add_module(object_planner_py
+  NB_STATIC
+  py_src/object_planner_py/py_bindings.cpp
+)
 target_link_libraries(object_planner_py PRIVATE object_planner_core)
 
-# Install the compiled module into the python package directory
 install(TARGETS object_planner_py DESTINATION object_planner_py)
+install(DIRECTORY include/ DESTINATION include)

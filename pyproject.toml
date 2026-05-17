@@ -1,11 +1,11 @@
 [build-system]
-requires = ["scikit-build-core>=0.4.0", "pybind11", "numpy"]
+requires = ["scikit-build-core>=0.4.0", "nanobind>=2.0.0", "numpy"]
 build-backend = "scikit_build_core.build"
 
 [project]
 name = "object_planner_py"
-version = "0.2.0"
-description = "A SIMD-accelerated 3-DOF RRT* planner for tabletop objects"
+version = "0.3.0"
+description = "A header-only, SIMD-accelerated 3-DOF object planner for tabletop pushing"
 readme = "README.md"
 authors = [{ name = "AI Assistant", email = "ai@example.com" }]
 license = { text = "MIT" }
@@ -20,6 +20,5 @@ dependencies = [
 ]
 
 [tool.scikit-build]
-cmake.minimum-version = "3.15"
-# Tells scikit-build where the python package source is located
+cmake.minimum-version = "3.18"
 wheel.packages = ["py_src/object_planner_py"]

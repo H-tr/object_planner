@@ -1,37 +1,56 @@
 # 3D Object Planner
 
-A high-performance, 3-DOF (x, y, theta) motion planner for moving objects in a plan. The planner finds collision-free asymptotically optimal paths using rrt* for an object represented as a point cloud among 3D obstacles.
-
-This project is implemented in C++ for performance and wrapped in Python using `pybind11` for ease of use.
-
-![Planning Result](assets/planning.jpg)
-*Example of collision-free path planning for a 3D object navigating through obstacles using RRT***
+A **header-only**, SIMD-accelerated 3-DOF (x, y, theta) motion planner for
+moving a single rigid object through a tabletop scene of obstacle point
+clouds. Drop the headers into any C++ project, or use the bundled
+nanobind Python module.
 
 ## Features
 
--   **RRT\* Planner**: An optimal sampling-based algorithm to quickly find high-quality paths.
--   **Sphere Tree BVH**: The object is pre-processed into a Bounding Volume Hierarchy of spheres for extremely fast collision checks.
--   **SIMD Acceleration**: Collision checking is batched and accelerated using CPU vector instructions (`xsimd`) for maximum performance.
--   **KD-Tree for Obstacles**: Obstacle point clouds are structured in a KD-Tree (`nanoflann`) for efficient nearest-neighbor and radius searches.
--   **Path Smoothing**: A final shortcutting pass is applied to the RRT* path to make it smoother and more direct.
--   **Modern Build System**: Uses `pyproject.toml` with `scikit-build-core` and a `conda` environment for a reproducible and easy-to-manage build process.
+- **Header-only C++17**: `#include <object_planner/object_planner.hpp>` —
+  no built library required for downstream consumers.
+- **Sphere-vs-sphere collision with per-cloud inflation**: every
+  obstacle point is treated as a sphere of configurable radius. The
+  object is decomposed into a BVH of bounding spheres; only the leaves
+  are consulted at query time.
+- **Genuinely SIMD inner loop**: obstacle points live in a
+  structure-of-arrays BSP tree; the per-leaf distance check is a single
+  `xsimd::batch<float>` reduction (8-wide on AVX2, 4-wide on NEON).
+- **RRT\***: optimal sampling-based motion planning. (Will be replaced
+  with RRT-Connect + VAMP-style simplification in upcoming milestones.)
+- **nanobind Python module**: lightweight bindings, no pybind11
+  dependency.
 
-## Installation
+## C++ integration (header-only)
 
-This project is best managed using the Conda package manager to ensure all C++ and Python dependencies are consistent.
-
-```bash
-git clone https://github.com/H-tr/object_planner.git
-cd object_planner
-conda create -n obj_planner python=3.10
-conda activate obj_planner
-pip install -e .
+```cmake
+add_subdirectory(third_party/object_planner)
+target_link_libraries(my_target PRIVATE object_planner::object_planner)
 ```
 
-## Usage
+```cpp
+#include <object_planner/object_planner.hpp>
+using namespace object_planner;
 
-Run the example to see the planner in action:
+auto tree = SphereTreeBuilder::build(object_points);
+BatchedCollisionChecker checker(tree, obstacle_points, /*point_inflation=*/0.012f);
+RRTStarPlanner planner(&checker, bounds_min, bounds_max);
+auto path = planner.plan(start, goal, RRTStarPlanner::PlanParams{});
+```
+
+Required: Eigen 3.3+ and a C++17 compiler. `xsimd` is fetched
+automatically via `FetchContent` when you `add_subdirectory()`.
+
+## Python install
 
 ```bash
-python example/run_planner.py
+pip install -e third_party/object_planner   # editable build
+# or, inside this repo's pixi env:
+pixi install
+```
+
+## Run the demo
+
+```bash
+python third_party/object_planner/examples/run_planner.py
 ```

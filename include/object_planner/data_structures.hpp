@@ -1,14 +1,13 @@
 #pragma once
 
 #include <Eigen/Dense>
-#include <vector>
 
 namespace object_planner {
 
 struct Config {
   double x, y, theta;
-  Config(double x = 0.0, double y = 0.0, double t = 0.0)
-      : x(x), y(y), theta(t) {}
+  Config(double x_ = 0.0, double y_ = 0.0, double t = 0.0)
+      : x(x_), y(y_), theta(t) {}
 };
 
 using Point3D = Eigen::Vector3d;
