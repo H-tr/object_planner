@@ -1,0 +1,33 @@
+name: C++ tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  ctest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake ninja-build libeigen3-dev
+
+      - name: Configure (tests on, Python off)
+        run: |
+          cmake -G Ninja \
+            -DOBJECT_PLANNER_BUILD_TESTS=ON \
+            -DOBJECT_PLANNER_BUILD_PYTHON=OFF \
+            -DCMAKE_BUILD_TYPE=Release \
+            -B build -S .
+
+      - name: Build
+        run: cmake --build build --target object_planner_tests
+
+      - name: Run ctest
+        run: ctest --test-dir build --output-on-failure
