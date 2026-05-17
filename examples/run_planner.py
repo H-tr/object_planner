@@ -116,7 +116,7 @@ def main():
     OBSTACLE_HEIGHT = 0.2
     PLANNER_ITERATIONS = 5000
     PLANNER_STEP_SIZE = 0.2
-    SMOOTHING_ITERATIONS = 50
+    SIMPLIFY_ITERATIONS = 50
     # --- END CONFIGURATION ---
 
     print("--- Setting up Large, Cluttered Scene for Cross-Map Planning ---")
@@ -171,16 +171,17 @@ def main():
     plan_params = opp.PlanParams()
     plan_params.max_iterations = PLANNER_ITERATIONS
     plan_params.step_size = PLANNER_STEP_SIZE
-    plan_params.goal_bias = 0.05
-    plan_params.neighborhood_radius = 0.5
+
+    simplify_settings = opp.SimplifySettings()
+    simplify_settings.max_iterations = SIMPLIFY_ITERATIONS
+
     print(f"\n--- Planning from {start_config} to {goal_config} ---")
     start_time = time.time()
-    # The planner now returns the sparse path directly
     path = planner.plan(
         start=start_config,
         goal=goal_config,
         plan_params=plan_params,
-        smoothing_iterations=SMOOTHING_ITERATIONS,
+        simplify_settings=simplify_settings,
     )
     end_time = time.time()
 
