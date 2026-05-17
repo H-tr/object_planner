@@ -28,8 +28,8 @@ inline std::vector<Point3D> numpy_to_points(const NumpyPoints &arr) {
   return points;
 }
 
-// Holds the collision checker + RRT* planner + smoother together so the
-// Python caller can keep a single Planner object across plan() calls.
+// Holds the collision checker + RRT-Connect planner + smoother together
+// so the Python caller can keep a single Planner object across plan() calls.
 class Planner {
 public:
   Planner(const NumpyPoints &object_points, const NumpyPoints &obstacle_points,
@@ -44,12 +44,12 @@ public:
     Config bmin(x_bounds.first, y_bounds.first, theta_bounds.first);
     Config bmax(x_bounds.second, y_bounds.second, theta_bounds.second);
     rrt_planner_ =
-        std::make_unique<RRTStarPlanner>(checker_.get(), bmin, bmax);
+        std::make_unique<RRTConnectPlanner>(checker_.get(), bmin, bmax);
     smoother_ = std::make_unique<PathSmoother>(checker_.get());
   }
 
   std::vector<Config> plan(const Config &start, const Config &goal,
-                            const RRTStarPlanner::PlanParams &params,
+                            const RRTConnectPlanner::PlanParams &params,
                             int smoothing_iterations) {
     auto raw = rrt_planner_->plan(start, goal, params);
     if (raw.empty()) return {};
@@ -62,7 +62,7 @@ public:
 
 private:
   std::unique_ptr<BatchedCollisionChecker> checker_;
-  std::unique_ptr<RRTStarPlanner> rrt_planner_;
+  std::unique_ptr<RRTConnectPlanner> rrt_planner_;
   std::unique_ptr<PathSmoother> smoother_;
 };
 
@@ -82,13 +82,12 @@ NB_MODULE(object_planner_py, m) {
                ", theta=" + std::to_string(c.theta) + ")>";
       });
 
-  nb::class_<RRTStarPlanner::PlanParams>(m, "PlanParams")
+  nb::class_<RRTConnectPlanner::PlanParams>(m, "PlanParams")
       .def(nb::init<>())
-      .def_rw("max_iterations", &RRTStarPlanner::PlanParams::max_iterations)
-      .def_rw("step_size", &RRTStarPlanner::PlanParams::step_size)
-      .def_rw("goal_bias", &RRTStarPlanner::PlanParams::goal_bias)
-      .def_rw("neighborhood_radius",
-              &RRTStarPlanner::PlanParams::neighborhood_radius);
+      .def_rw("max_iterations", &RRTConnectPlanner::PlanParams::max_iterations)
+      .def_rw("step_size", &RRTConnectPlanner::PlanParams::step_size)
+      .def_rw("collision_check_resolution",
+              &RRTConnectPlanner::PlanParams::collision_check_resolution);
 
   nb::class_<Planner>(m, "Planner")
       .def(nb::init<const NumpyPoints &, const NumpyPoints &,
@@ -98,7 +97,7 @@ NB_MODULE(object_planner_py, m) {
            "object_points"_a, "obstacle_points"_a, "x_bounds"_a,
            "y_bounds"_a, "theta_bounds"_a, "point_inflation"_a = 0.0f)
       .def("plan", &Planner::plan, "start"_a, "goal"_a,
-           "plan_params"_a = RRTStarPlanner::PlanParams(),
+           "plan_params"_a = RRTConnectPlanner::PlanParams(),
            "smoothing_iterations"_a = 100)
       .def("is_config_in_collision", &Planner::is_config_in_collision,
            "config"_a, "Checks if a single configuration is in collision.");

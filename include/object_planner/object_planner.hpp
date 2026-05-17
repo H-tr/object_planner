@@ -6,5 +6,5 @@
 #include "data_structures.hpp"
 #include "sphere_tree_builder.hpp"
 #include "batched_collision_checker.hpp"
-#include "rrt_star.hpp"
+#include "rrt_connect.hpp"
 #include "path_smoother.hpp"
