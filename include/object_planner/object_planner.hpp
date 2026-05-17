@@ -7,4 +7,4 @@
 #include "sphere_tree_builder.hpp"
 #include "batched_collision_checker.hpp"
 #include "rrt_connect.hpp"
-#include "path_smoother.hpp"
+#include "simplify.hpp"

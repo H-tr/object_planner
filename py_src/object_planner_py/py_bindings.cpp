@@ -1,11 +1,13 @@
 #include <nanobind/nanobind.h>
 #include <nanobind/ndarray.h>
+#include <nanobind/stl/optional.h>
 #include <nanobind/stl/pair.h>
 #include <nanobind/stl/vector.h>
 
 #include "object_planner/object_planner.hpp"
 
 #include <memory>
+#include <optional>
 #include <string>
 
 namespace nb = nanobind;
@@ -28,8 +30,9 @@ inline std::vector<Point3D> numpy_to_points(const NumpyPoints &arr) {
   return points;
 }
 
-// Holds the collision checker + RRT-Connect planner + smoother together
-// so the Python caller can keep a single Planner object across plan() calls.
+// Holds the collision checker + RRT-Connect planner + VAMP-style
+// simplifier together. Python callers keep a single Planner across
+// plan() calls so the BVH and BSP tree are only built once.
 class Planner {
 public:
   Planner(const NumpyPoints &object_points, const NumpyPoints &obstacle_points,
@@ -45,15 +48,19 @@ public:
     Config bmax(x_bounds.second, y_bounds.second, theta_bounds.second);
     rrt_planner_ =
         std::make_unique<RRTConnectPlanner>(checker_.get(), bmin, bmax);
-    smoother_ = std::make_unique<PathSmoother>(checker_.get());
+    simplifier_ = std::make_unique<Simplifier>(checker_.get(), bmin, bmax);
   }
 
   std::vector<Config> plan(const Config &start, const Config &goal,
                             const RRTConnectPlanner::PlanParams &params,
-                            int smoothing_iterations) {
+                            std::optional<SimplifySettings> simplify_settings) {
     auto raw = rrt_planner_->plan(start, goal, params);
     if (raw.empty()) return {};
-    return smoother_->smooth(raw, smoothing_iterations);
+    if (simplify_settings.has_value()) {
+      return simplifier_->simplify(std::move(raw), simplify_settings.value(),
+                                    params.collision_check_resolution);
+    }
+    return raw;
   }
 
   bool is_config_in_collision(const Config &c) const {
@@ -63,13 +70,13 @@ public:
 private:
   std::unique_ptr<BatchedCollisionChecker> checker_;
   std::unique_ptr<RRTConnectPlanner> rrt_planner_;
-  std::unique_ptr<PathSmoother> smoother_;
+  std::unique_ptr<Simplifier> simplifier_;
 };
 
 } // namespace
 
 NB_MODULE(object_planner_py, m) {
-  m.doc() = "SIMD-accelerated 3-DOF object planner with configurable bounds";
+  m.doc() = "SIMD-accelerated 3-DOF object planner (RRT-Connect + VAMP simplify)";
 
   nb::class_<Config>(m, "Config")
       .def(nb::init<double, double, double>(), "x"_a = 0.0, "y"_a = 0.0,
@@ -89,6 +96,43 @@ NB_MODULE(object_planner_py, m) {
       .def_rw("collision_check_resolution",
               &RRTConnectPlanner::PlanParams::collision_check_resolution);
 
+  nb::enum_<SimplifyOp>(m, "SimplifyOp")
+      .value("Shortcut", SimplifyOp::Shortcut)
+      .value("Reduce", SimplifyOp::Reduce)
+      .value("Perturb", SimplifyOp::Perturb)
+      .value("BSpline", SimplifyOp::BSpline);
+
+  nb::class_<ShortcutSettings>(m, "ShortcutSettings").def(nb::init<>());
+
+  nb::class_<ReduceSettings>(m, "ReduceSettings")
+      .def(nb::init<>())
+      .def_rw("max_steps", &ReduceSettings::max_steps)
+      .def_rw("max_empty_steps", &ReduceSettings::max_empty_steps)
+      .def_rw("range_ratio", &ReduceSettings::range_ratio);
+
+  nb::class_<PerturbSettings>(m, "PerturbSettings")
+      .def(nb::init<>())
+      .def_rw("max_steps", &PerturbSettings::max_steps)
+      .def_rw("max_empty_steps", &PerturbSettings::max_empty_steps)
+      .def_rw("perturbation_attempts", &PerturbSettings::perturbation_attempts)
+      .def_rw("range", &PerturbSettings::range);
+
+  nb::class_<BSplineSettings>(m, "BSplineSettings")
+      .def(nb::init<>())
+      .def_rw("max_steps", &BSplineSettings::max_steps)
+      .def_rw("min_change", &BSplineSettings::min_change)
+      .def_rw("midpoint_interpolation",
+              &BSplineSettings::midpoint_interpolation);
+
+  nb::class_<SimplifySettings>(m, "SimplifySettings")
+      .def(nb::init<>())
+      .def_rw("max_iterations", &SimplifySettings::max_iterations)
+      .def_rw("operations", &SimplifySettings::operations)
+      .def_rw("shortcut", &SimplifySettings::shortcut)
+      .def_rw("reduce", &SimplifySettings::reduce)
+      .def_rw("perturb", &SimplifySettings::perturb)
+      .def_rw("bspline", &SimplifySettings::bspline);
+
   nb::class_<Planner>(m, "Planner")
       .def(nb::init<const NumpyPoints &, const NumpyPoints &,
                     const std::pair<double, double> &,
@@ -98,7 +142,10 @@ NB_MODULE(object_planner_py, m) {
            "y_bounds"_a, "theta_bounds"_a, "point_inflation"_a = 0.0f)
       .def("plan", &Planner::plan, "start"_a, "goal"_a,
            "plan_params"_a = RRTConnectPlanner::PlanParams(),
-           "smoothing_iterations"_a = 100)
+           "simplify_settings"_a = nb::none(),
+           "Plan a path. If simplify_settings is None, the raw RRT-Connect "
+           "path is returned; otherwise it is post-processed by the "
+           "VAMP-style simplifier.")
       .def("is_config_in_collision", &Planner::is_config_in_collision,
            "config"_a, "Checks if a single configuration is in collision.");
 }
