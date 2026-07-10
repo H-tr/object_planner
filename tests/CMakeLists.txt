@@ -13,6 +13,7 @@ add_executable(object_planner_tests
   test_sphere_tree_builder.cpp
   test_batched_collision_checker.cpp
   test_rrt_connect.cpp
+  test_bit_star.cpp
   test_simplify.cpp
 )
 target_link_libraries(object_planner_tests PRIVATE
