@@ -1,5 +1,5 @@
 [build-system]
-requires = ["scikit-build-core>=0.4.0", "nanobind>=2.0.0", "numpy"]
+requires = ["scikit-build-core>=0.8.0", "nanobind>=2.0.0", "numpy"]
 build-backend = "scikit_build_core.build"
 
 [project]
@@ -20,5 +20,5 @@ dependencies = [
 ]
 
 [tool.scikit-build]
-cmake.minimum-version = "3.18"
+cmake.version = ">=3.18"
 wheel.packages = ["py_src/object_planner_py"]
