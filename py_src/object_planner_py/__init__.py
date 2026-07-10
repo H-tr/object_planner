@@ -1,6 +1,7 @@
 # This file makes this directory a Python package and exposes the C++ members.
 
 from .object_planner_py import (
+    BITStarParams,
     BSplineSettings,
     Config,
     PerturbSettings,
@@ -13,6 +14,7 @@ from .object_planner_py import (
 )
 
 __all__ = [
+    "BITStarParams",
     "BSplineSettings",
     "Config",
     "PerturbSettings",

@@ -16,8 +16,10 @@ nanobind Python module.
 - **Genuinely SIMD inner loop**: obstacle points live in a
   structure-of-arrays BSP tree; the per-leaf distance check is a single
   `xsimd::batch<float>` reduction (8-wide on AVX2, 4-wide on NEON).
-- **RRT\***: optimal sampling-based motion planning. (Will be replaced
-  with RRT-Connect + VAMP-style simplification in upcoming milestones.)
+- **RRT-Connect**: fast bidirectional planning for a first feasible path,
+  plus a VAMP-style `Simplifier` to shorten it.
+- **BIT\***: anytime, asymptotically optimal planning that minimises a
+  user-supplied cost function.
 - **nanobind Python module**: lightweight bindings, no pybind11
   dependency.
 
@@ -34,23 +36,73 @@ using namespace object_planner;
 
 auto tree = SphereTreeBuilder::build(object_points);
 BatchedCollisionChecker checker(tree, obstacle_points, /*point_inflation=*/0.012f);
-RRTStarPlanner planner(&checker, bounds_min, bounds_max);
-auto path = planner.plan(start, goal, RRTStarPlanner::PlanParams{});
+
+// First feasible path, then shortened.
+RRTConnectPlanner planner(&checker, bounds_min, bounds_max);
+auto path = planner.plan(start, goal, RRTConnectPlanner::PlanParams{});
+Simplifier simplifier(&checker, bounds_min, bounds_max);
+path = simplifier.simplify(path, SimplifySettings{});
 ```
 
 Required: Eigen 3.3+ and a C++17 compiler. `xsimd` is fetched
 automatically via `FetchContent` when you `add_subdirectory()`.
 
-## Python install
+## Planning against a cost function (BIT\*)
+
+`BITStarPlanner` returns the cheapest path it can find rather than the
+first feasible one. It minimises the line integral of `1 + state_cost`
+along the path, so an edge costs the distance it covers plus whatever
+extra `CostFunction::state_cost` charges for the configurations it
+passes through.
+
+```cpp
+// The (x, y, theta) dependencies the cost needs, fixed at setup.
+std::vector<Config> cost_context = {{0.4, 0.1, 0.0}, {0.9, -0.2, 1.57}};
+BITStarPlanner planner(&checker, bounds_min, bounds_max, cost_context);
+auto path = planner.plan(start, goal, BITStarPlanner::PlanParams{});
+const double cost = planner.solution_cost();  // infinity if no path
+```
+
+`CostFunction::state_cost` in `include/object_planner/cost_function.hpp`
+is a stub returning `0.0`, which makes BIT\* minimise plain path length.
+It is the only function to implement; it must stay finite and
+non-negative, which is what keeps `CostFunction::heuristic_cost` an
+admissible lower bound and BIT\* convergent.
+
+From Python, the context is a list of `Config`:
+
+```python
+planner = opp.Planner(..., cost_context=[opp.Config(0.4, 0.1, 0.0)])
+path = planner.plan_bit_star(start, goal, opp.BITStarParams())
+cost = planner.bit_star_solution_cost()
+```
+
+## C++ tests
 
 ```bash
-pip install -e third_party/object_planner   # editable build
-# or, inside this repo's pixi env:
-pixi install
+cmake -S . -B build -DOBJECT_PLANNER_BUILD_TESTS=ON -DOBJECT_PLANNER_BUILD_PYTHON=OFF
+cmake --build build -j
+ctest --test-dir build --output-on-failure
+```
+
+## Python install
+
+Build into a virtual environment; the extension is compiled on install, so
+you need a C++17 compiler and Eigen 3.3+ on the system.
+
+```bash
+python3 -m venv .venv && source .venv/bin/activate   # or: uv venv && source .venv/bin/activate
+pip install -e .                                     # editable build
 ```
 
 ## Run the demo
 
+The demos render with Open3D, which is not a library dependency:
+
 ```bash
-python third_party/object_planner/examples/run_planner.py
+pip install open3d
+python examples/run_rrtc_planner.py   # RRT-Connect + simplify
+python examples/run_bit_star.py       # BIT*, sweeping the batch budget
 ```
+
+`run_bit_star.py --no-viz` plans and prints without opening a window.
